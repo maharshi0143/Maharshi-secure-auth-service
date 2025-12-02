@@ -5,9 +5,10 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-  "test": "echo \"Error: no test specified\" && exit 1",
-  "request-seed": "node request_seed.js",
-  "decrypt-seed-local": "node test_decrypt_seed.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "request-seed": "node request_seed.js",
+    "decrypt-seed-local": "node test_decrypt_seed.js",
+    "test-totp-local": "node test_totp.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,8 @@
   },
   "homepage": "https://github.com/maharshi0143/Maharshi-secure-auth-service#readme",
   "dependencies": {
-    "axios": "^1.13.2"
+    "axios": "^1.13.2",
+    "hi-base32": "^0.5.1",
+    "otplib": "^12.0.1"
   }
 }
