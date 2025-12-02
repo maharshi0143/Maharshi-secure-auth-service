@@ -1,0 +1,25 @@
+{
+  "name": "maharshi-secure-auth-service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "request-seed": "node request-seed.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maharshi0143/Maharshi-secure-auth-service.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/maharshi0143/Maharshi-secure-auth-service/issues"
+  },
+  "homepage": "https://github.com/maharshi0143/Maharshi-secure-auth-service#readme",
+  "dependencies": {
+    "axios": "^1.13.2"
+  }
+}
