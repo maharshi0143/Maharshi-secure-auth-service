@@ -5,8 +5,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "request-seed": "node request-seed.js"
+  "test": "echo \"Error: no test specified\" && exit 1",
+  "request-seed": "node request_seed.js",
+  "decrypt-seed-local": "node test_decrypt_seed.js"
   },
   "repository": {
     "type": "git",
