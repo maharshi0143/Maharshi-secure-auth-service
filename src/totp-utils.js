@@ -26,17 +26,27 @@ export function generateTotpCode(hexSeed) {
 }
 
 export function verifyTotpCode(hexSeed, code, validWindow = 1) {
+  if (!code) return false;
+
+  // Normalize code: string, trimmed, remove spaces
+  const normalizedCode = String(code).trim().replace(/\s+/g, "");
+
+  // Must be exactly 6 digits
+  if (!/^\d{6}$/.test(normalizedCode)) {
+    return false;
+  }
+
   const base32Seed = hexToBase32(hexSeed);
 
   return totp.verify({
-    token: code,
+    token: normalizedCode,
     secret: base32Seed,
     window: validWindow
   });
 }
 
 export function getTotpValidForSeconds() {
-  const step = 30;
+  const step = totp.options.step || 30; // 30s period
   const now = Math.floor(Date.now() / 1000);
   return step - (now % step);
 }
