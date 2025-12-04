@@ -120,7 +120,7 @@ app.get("/debug-2fa", (req, res) => {
 // Health
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
-// Print registered routes after the current event loop turn so Express has registered them
+// Helper to print registered routes
 function printRoutes() {
   console.log("Registered routes:");
   if (!app._router) {
@@ -134,10 +134,34 @@ function printRoutes() {
     }
   });
 }
-setImmediate(printRoutes);
 
-// Start
+// Start server on port 8080 and print routes once the server is ready
+// Start server on port 8080 and print routes once the server is ready
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
+  try {
+    // Attempt to print routes from Express internal router
+    if (app._router && Array.isArray(app._router.stack) && app._router.stack.length > 0) {
+      console.log("Registered routes:");
+      app._router.stack.forEach((m) => {
+        if (m.route && m.route.path) {
+          const methods = Object.keys(m.route.methods).join(",").toUpperCase();
+          console.log(`${methods} ${m.route.path}`);
+        }
+      });
+    } else {
+      // Fallback: express may not have initialized internal router yet in certain runtimes.
+      // Print a deterministic list of the endpoints we registered so logs are clear.
+      console.log("Registered routes (fallback):");
+      console.log("POST /decrypt-seed");
+      console.log("GET  /generate-2fa");
+      console.log("POST /verify-2fa");
+      console.log("GET  /debug-2fa");
+      console.log("GET  /health");
+    }
+  } catch (e) {
+    console.log("Failed to print routes:", e?.message || e);
+  }
+
   console.log(`Auth service listening on port ${PORT}`);
 });
