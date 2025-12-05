@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maharshi-secure-auth-service
+    ports:
+      - "8080:8080"
+    environment:
+      - TZ=UTC
+      - SEED_FILE_PATH=/data/seed.txt
+      - ENCRYPTED_SEED_PATH=/data/encrypted_seed.txt
+    volumes:
+      - seed-data:/data
+      - cron-output:/cron
+      # Mount encrypted seed (read-only)
+      - ./encrypted_seed.txt:/data/encrypted_seed.txt:ro
+      # Mount keys (read-only)
+      - ./student_private.pem:/app/student_private.pem:ro
+      - ./student_public.pem:/app/student_public.pem:ro
+      - ./instructor_public.pem:/app/instructor_public.pem:ro
+    restart: unless-stopped
+
+volumes:
+  seed-data:
+  cron-output:
