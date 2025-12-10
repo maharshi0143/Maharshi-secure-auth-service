@@ -5,17 +5,35 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { decryptSeed } from "./crypto-utils.js";
-import { generateTotpCode, verifyTotpCode, getTotpValidForSeconds } from "./totp-utils.js";
+import {
+  generateTotpCode,
+  verifyTotpCode,
+  getTotpValidForSeconds,
+} from "./totp-utils.js";
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "5mb" })); // instead of just express.json()
+
+
+// Optional: handle body-parser errors cleanly (like PayloadTooLargeError)
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.too.large") {
+    return res.status(413).json({ error: "Request entity too large" });
+  }
+  if (err) {
+    console.error("Body parse error:", err.message);
+    return res.status(400).json({ error: "Invalid JSON body" });
+  }
+  next();
+});
 
 // Resolve paths in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Seed file path (overridable via env in Docker)
-const SEED_FILE_PATH = process.env.SEED_FILE_PATH || path.join(__dirname, "..", "data", "seed.txt");
+const SEED_FILE_PATH =
+  process.env.SEED_FILE_PATH || path.join(__dirname, "..", "data", "seed.txt");
 
 // Ensure seed directory exists (for local dev)
 function ensureSeedDir() {
@@ -38,13 +56,21 @@ function readHexSeedFromFile() {
  */
 app.post("/decrypt-seed", (req, res) => {
   const { encrypted_seed } = req.body || {};
+
   if (!encrypted_seed || typeof encrypted_seed !== "string") {
     return res.status(400).json({ error: "encrypted_seed is required" });
   }
 
   try {
-    const hexSeed = decryptSeed(encrypted_seed); // crypto-utils.js must export decryptSeed
-    if (!hexSeed || hexSeed.length !== 64 || !/^[0-9a-f]{64}$/i.test(hexSeed)) {
+    // Trim to remove accidental newlines/whitespace
+    const cleanedEncryptedSeed = encrypted_seed.trim();
+
+    const hexSeed = decryptSeed(cleanedEncryptedSeed); // crypto-utils.js must export decryptSeed
+    if (
+      !hexSeed ||
+      hexSeed.length !== 64 ||
+      !/^[0-9a-f]{64}$/i.test(hexSeed)
+    ) {
       throw new Error("Decrypted seed is not a valid 64-character hex string");
     }
 
@@ -63,7 +89,8 @@ app.post("/decrypt-seed", (req, res) => {
  */
 app.get("/generate-2fa", (req, res) => {
   try {
-    if (!seedFileExists()) return res.status(500).json({ error: "Seed not decrypted yet" });
+    if (!seedFileExists())
+      return res.status(500).json({ error: "Seed not decrypted yet" });
     const hexSeed = readHexSeedFromFile();
     const code = generateTotpCode(hexSeed);
     const valid_for = getTotpValidForSeconds();
@@ -80,17 +107,26 @@ app.get("/generate-2fa", (req, res) => {
  * Response: { valid: true|false }
  */
 app.post("/verify-2fa", (req, res) => {
-  const { code } = req.body || {};
-  if (!code) return res.status(400).json({ error: "Missing code" });
+  const rawCode = req.body?.code;
+  const code = String(rawCode ?? "").trim();
+
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: "Missing or invalid code" });
+  }
 
   try {
-    if (!seedFileExists()) return res.status(500).json({ error: "Seed not decrypted yet" });
+    if (!seedFileExists()) {
+      return res.status(500).json({ error: "Seed not decrypted yet" });
+    }
+
     const hexSeed = readHexSeedFromFile();
     const isValid = verifyTotpCode(hexSeed, code, 1);
+
     console.log("---- /verify-2fa ----");
     console.log("Received code:", code);
     console.log("Hex seed:", hexSeed);
     console.log("Verification result:", isValid);
+
     return res.status(200).json({ valid: isValid });
   } catch (err) {
     console.error("Error in /verify-2fa:", err.message);
@@ -98,13 +134,15 @@ app.post("/verify-2fa", (req, res) => {
   }
 });
 
+
 /**
  * GET /debug-2fa
  * Generates + immediately verifies a TOTP internally (useful for debugging)
  */
 app.get("/debug-2fa", (req, res) => {
   try {
-    if (!seedFileExists()) return res.status(500).json({ error: "Seed not decrypted yet" });
+    if (!seedFileExists())
+      return res.status(500).json({ error: "Seed not decrypted yet" });
     const hexSeed = readHexSeedFromFile();
     const code = generateTotpCode(hexSeed);
     const valid_for = getTotpValidForSeconds();
@@ -120,28 +158,11 @@ app.get("/debug-2fa", (req, res) => {
 // Health
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
-// Helper to print registered routes
-function printRoutes() {
-  console.log("Registered routes:");
-  if (!app._router) {
-    console.log("No router found on app");
-    return;
-  }
-  app._router.stack.forEach((m) => {
-    if (m.route && m.route.path) {
-      const methods = Object.keys(m.route.methods).join(",").toUpperCase();
-      console.log(`${methods} ${m.route.path}`);
-    }
-  });
-}
-
-// Start server on port 8080 and print routes once the server is ready
 // Start server on port 8080 and print routes once the server is ready
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () => {
   try {
-    // Attempt to print routes from Express internal router
-    if (app._router && Array.isArray(app._router.stack) && app._router.stack.length > 0) {
+    if (app._router && Array.isArray(app._router.stack)) {
       console.log("Registered routes:");
       app._router.stack.forEach((m) => {
         if (m.route && m.route.path) {
@@ -150,8 +171,6 @@ app.listen(PORT, "0.0.0.0", () => {
         }
       });
     } else {
-      // Fallback: express may not have initialized internal router yet in certain runtimes.
-      // Print a deterministic list of the endpoints we registered so logs are clear.
       console.log("Registered routes (fallback):");
       console.log("POST /decrypt-seed");
       console.log("GET  /generate-2fa");
